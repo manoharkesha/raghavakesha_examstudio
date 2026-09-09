@@ -60,6 +60,19 @@ export async function loadCloudStudents() {
   return (data || []).map(profile => ({ id: profile.id, name: profile.full_name, course: profile.course, year: profile.study_year, role: profile.role }));
 }
 
+export async function loadCloudStudentAttempts() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('student_progress').select('user_id, attempts');
+  if (error) throw error;
+  return (data || []).flatMap(row => (row.attempts || []).map(attempt => ({ ...attempt, userId: row.user_id })));
+}
+
+export async function deleteCloudStudent(userId) {
+  if (!supabase) return;
+  const { error } = await supabase.rpc('delete_student_account', { student_id: userId });
+  if (error) throw error;
+}
+
 export async function loadCloudPapers() {
   if (!supabase) return [];
   const { data, error } = await supabase.from('papers').select('id, title, course, publish_date, status, questions(id, prompt, position, options(id, option_text, position, is_correct))').eq('status', 'Published').order('publish_date', { ascending: false });
