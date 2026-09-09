@@ -52,3 +52,41 @@ export async function saveCloudAttempts(userId, attempts) {
   const { error } = await supabase.from('student_progress').upsert({ user_id: userId, attempts });
   if (error) throw error;
 }
+
+export async function loadCloudStudents() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('profiles').select('id, full_name, course, study_year, role').eq('role', 'student').order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(profile => ({ id: profile.id, name: profile.full_name, course: profile.course, year: profile.study_year, role: profile.role }));
+}
+
+export async function loadCloudPapers() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('papers').select('id, title, course, publish_date, status, questions(id, prompt, position, options(id, option_text, position, is_correct))').eq('status', 'Published').order('publish_date', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(paper => ({
+    id: paper.id,
+    title: paper.title,
+    course: paper.course,
+    date: paper.publish_date,
+    status: paper.status,
+    questions: (paper.questions || []).sort((a, b) => a.position - b.position).map(question => ({
+      id: question.id,
+      text: question.prompt,
+      options: (question.options || []).sort((a, b) => a.position - b.position).map(option => option.option_text),
+      answers: (question.options || []).filter(option => option.is_correct).sort((a, b) => a.position - b.position).map(option => option.position)
+    }))
+  }));
+}
+
+export async function saveCloudPaper(paper) {
+  if (!supabase) return;
+  const { data: savedPaper, error: paperError } = await supabase.from('papers').insert({ title: paper.title, course: paper.course, publish_date: paper.date, status: paper.status }).select('id').single();
+  if (paperError) throw paperError;
+  for (const [questionIndex, question] of paper.questions.entries()) {
+    const { data: savedQuestion, error: questionError } = await supabase.from('questions').insert({ paper_id: savedPaper.id, prompt: question.text, position: questionIndex }).select('id').single();
+    if (questionError) throw questionError;
+    const { error: optionsError } = await supabase.from('options').insert(question.options.map((option, optionIndex) => ({ question_id: savedQuestion.id, option_text: option, position: optionIndex, is_correct: (question.answers || []).includes(optionIndex) })));
+    if (optionsError) throw optionsError;
+  }
+}
