@@ -84,6 +84,16 @@ function App() {
     if (supabase) await changeCloudStudentPassword(student.id, newPassword);
     setStore(current => ({ ...current, users: current.users.map(user => user.id === student.id ? { ...user, password: newPassword } : user) }));
   };
+  const deleteStudent = async student => {
+    if (!window.confirm(`Delete ${student.name}'s account and all results?`)) return;
+    try {
+      if (supabase) await deleteCloudStudent(student.id);
+      setStore(current => ({ ...current, users: current.users.filter(user => user.id !== student.id), attempts: current.attempts.filter(attempt => attempt.userId !== student.id) }));
+      setNotice(`${student.name}'s account was deleted.`);
+    } catch (error) {
+      setCloudSyncError(`Student account could not be deleted: ${error.message}`);
+    }
+  };
 
   if (!session) return <AuthScreen onLogin={async (name, password) => { if (typeof name === 'object') return setSession(name); const user = await cloudLogin(name, password); if (user) setSession(user); }} onRegister={async (user) => { const cloudUser = await cloudRegister(user); const savedUser = cloudUser || user; setStore(current => ({ ...current, users: [...current.users, savedUser] })); setSession(savedUser); }} users={store.users} />;
   if (reviewAttempt) return <div className="review-shell"><div className="review-download-bar"><button className="secondary-button" onClick={() => downloadAnswerSheetPdf(reviewAttempt.paper, reviewAttempt.attempt, session.name)}><Download size={16} /> Download answer sheet PDF</button></div><ReviewRunner paper={reviewAttempt.paper} attempt={reviewAttempt.attempt} onBack={() => setReviewAttempt(null)} /></div>;
@@ -99,7 +109,7 @@ function App() {
       {view === 'exams' && <ExamLibrary session={session} store={store} startPaper={setActivePaper} />}
       {view === 'results' && <Results session={session} store={store} startPaper={setActivePaper} reviewAttempt={setReviewAttempt} />}
       {view === 'manage' && isAdmin && <ManagePapers store={store} setStore={setStore} setNotice={setNotice} cloudAdmin={Boolean(supabase && session.id)} />}
-      {view === 'students' && isAdmin && <FilteredStudentAnswerSheets store={store} setReviewAttempt={setReviewAttempt} onChangePassword={changeStudentPassword} />}
+      {view === 'students' && isAdmin && <FilteredStudentAnswerSheets store={store} setReviewAttempt={setReviewAttempt} onChangePassword={changeStudentPassword} onDeleteStudent={deleteStudent} />}
       {view === 'settings' && <Settings session={session} />}
     </main>
   </div>;
