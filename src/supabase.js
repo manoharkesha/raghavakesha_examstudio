@@ -60,6 +60,24 @@ export async function loadCloudStudents() {
   return (data || []).map(profile => ({ id: profile.id, name: profile.full_name, course: profile.course, year: profile.study_year, role: profile.role }));
 }
 
+export async function loadCloudPaperAccess() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('paper_student_access').select('paper_id, student_id');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function setCloudPaperStudentAccess(paperId, studentId, disabled) {
+  if (!supabase) return;
+  if (disabled) {
+    const { error } = await supabase.from('paper_student_access').upsert({ paper_id: paperId, student_id: studentId });
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase.from('paper_student_access').delete().eq('paper_id', paperId).eq('student_id', studentId);
+  if (error) throw error;
+}
+
 export async function loadCloudStudentAttempts() {
   if (!supabase) return [];
   const { data, error } = await supabase.from('student_progress').select('user_id, attempts');
