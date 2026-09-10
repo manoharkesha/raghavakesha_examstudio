@@ -91,6 +91,12 @@ export async function deleteCloudStudent(userId) {
   if (error) throw error;
 }
 
+export async function changeCloudStudentPassword(userId, newPassword) {
+  if (!supabase) return;
+  const { error } = await supabase.rpc('change_student_password', { student_id: userId, new_password: newPassword });
+  if (error) throw error;
+}
+
 export async function loadCloudPapers(includeDrafts = false) {
   if (!supabase) return [];
   let query = supabase.from('papers').select('id, title, course, publish_date, status, questions(id, prompt, position, options(id, option_text, position, is_correct))').order('publish_date', { ascending: false });

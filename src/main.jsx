@@ -7,9 +7,10 @@ import {
   Users, X, XCircle
 } from 'lucide-react';
 import './styles.css';
-import { cloudLogin, cloudRegister, cloudSignOut, deleteCloudPaper, deleteCloudStudent, loadCloudAttempts, loadCloudPapers, loadCloudStudentAttempts, loadCloudStudents, saveCloudAttempts, saveCloudPaper, supabase, updateCloudPaperStatus } from './supabase';
+import { changeCloudStudentPassword, cloudLogin, cloudRegister, cloudSignOut, deleteCloudPaper, deleteCloudStudent, loadCloudAttempts, loadCloudPapers, loadCloudStudentAttempts, loadCloudStudents, saveCloudAttempts, saveCloudPaper, supabase, updateCloudPaperStatus } from './supabase';
 import PaperAccessManager from './PaperAccessManager';
 import FilteredStudentAnswerSheets from './StudentAnswerSheets';
+import { downloadAnswerSheetPdf } from './answerSheetPdf';
 
 const STORAGE_KEY = 'zunaira-exam-studio-v1';
 const courses = ['C', 'C++', 'Java', 'Python'];
@@ -79,9 +80,13 @@ function App() {
   const isAdmin = session?.role === 'admin';
   const setPage = (page) => { setView(page); setActivePaper(null); setReviewAttempt(null); setMobileMenuOpen(false); };
   const signOut = () => { cloudSignOut().catch(() => {}); setSession(null); setPage('overview'); };
+  const changeStudentPassword = async (student, newPassword) => {
+    if (supabase) await changeCloudStudentPassword(student.id, newPassword);
+    setStore(current => ({ ...current, users: current.users.map(user => user.id === student.id ? { ...user, password: newPassword } : user) }));
+  };
 
   if (!session) return <AuthScreen onLogin={async (name, password) => { if (typeof name === 'object') return setSession(name); const user = await cloudLogin(name, password); if (user) setSession(user); }} onRegister={async (user) => { const cloudUser = await cloudRegister(user); const savedUser = cloudUser || user; setStore(current => ({ ...current, users: [...current.users, savedUser] })); setSession(savedUser); }} users={store.users} />;
-  if (reviewAttempt) return <ReviewRunner paper={reviewAttempt.paper} attempt={reviewAttempt.attempt} onBack={() => setReviewAttempt(null)} />;
+  if (reviewAttempt) return <div className="review-shell"><div className="review-download-bar"><button className="secondary-button" onClick={() => downloadAnswerSheetPdf(reviewAttempt.paper, reviewAttempt.attempt, session.name)}><Download size={16} /> Download answer sheet PDF</button></div><ReviewRunner paper={reviewAttempt.paper} attempt={reviewAttempt.attempt} onBack={() => setReviewAttempt(null)} /></div>;
   if (activePaper) return <ExamRunner paper={activePaper} user={session} store={store} setStore={setStore} onBack={() => setActivePaper(null)} onDone={(message) => { setActivePaper(null); setView('results'); setNotice(message); }} />;
 
   return <div className="app-shell">
@@ -94,7 +99,7 @@ function App() {
       {view === 'exams' && <ExamLibrary session={session} store={store} startPaper={setActivePaper} />}
       {view === 'results' && <Results session={session} store={store} startPaper={setActivePaper} reviewAttempt={setReviewAttempt} />}
       {view === 'manage' && isAdmin && <ManagePapers store={store} setStore={setStore} setNotice={setNotice} cloudAdmin={Boolean(supabase && session.id)} />}
-      {view === 'students' && isAdmin && <FilteredStudentAnswerSheets store={store} setReviewAttempt={setReviewAttempt} />}
+      {view === 'students' && isAdmin && <FilteredStudentAnswerSheets store={store} setReviewAttempt={setReviewAttempt} onChangePassword={changeStudentPassword} />}
       {view === 'settings' && <Settings session={session} />}
     </main>
   </div>;

@@ -22,3 +22,31 @@ $$;
 
 revoke all on function public.delete_student_account(uuid) from public;
 grant execute on function public.delete_student_account(uuid) to authenticated;
+
+create or replace function public.change_student_password(student_id uuid, new_password text)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth, extensions
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Only administrators can change student passwords';
+  end if;
+  if student_id = auth.uid() then
+    raise exception 'Administrators cannot change their own password here';
+  end if;
+  if length(new_password) < 4 then
+    raise exception 'Password must contain at least 4 characters';
+  end if;
+  update auth.users
+  set encrypted_password = crypt(new_password, gen_salt('bf')), updated_at = now()
+  where id = student_id;
+  if not found then
+    raise exception 'Student account was not found';
+  end if;
+end;
+$$;
+
+revoke all on function public.change_student_password(uuid, text) from public;
+grant execute on function public.change_student_password(uuid, text) to authenticated;
