@@ -9,6 +9,7 @@ import {
 import './styles.css';
 import { cloudLogin, cloudRegister, cloudSignOut, deleteCloudPaper, deleteCloudStudent, loadCloudAttempts, loadCloudPapers, loadCloudStudentAttempts, loadCloudStudents, saveCloudAttempts, saveCloudPaper, supabase, updateCloudPaperStatus } from './supabase';
 import PaperAccessManager from './PaperAccessManager';
+import FilteredStudentAnswerSheets from './StudentAnswerSheets';
 
 const STORAGE_KEY = 'zunaira-exam-studio-v1';
 const courses = ['C', 'C++', 'Java', 'Python'];
@@ -93,7 +94,7 @@ function App() {
       {view === 'exams' && <ExamLibrary session={session} store={store} startPaper={setActivePaper} />}
       {view === 'results' && <Results session={session} store={store} startPaper={setActivePaper} reviewAttempt={setReviewAttempt} />}
       {view === 'manage' && isAdmin && <ManagePapers store={store} setStore={setStore} setNotice={setNotice} cloudAdmin={Boolean(supabase && session.id)} />}
-      {view === 'students' && isAdmin && <StudentAnswerSheets store={store} setReviewAttempt={setReviewAttempt} onDelete={async (userId) => { if (supabase) await deleteCloudStudent(userId); setStore(current => ({ ...current, users: current.users.filter(user => user.id !== userId), attempts: current.attempts.filter(attempt => attempt.userId !== userId) })); setNotice('Student account deleted.'); }} />}
+      {view === 'students' && isAdmin && <FilteredStudentAnswerSheets store={store} setReviewAttempt={setReviewAttempt} />}
       {view === 'settings' && <Settings session={session} />}
     </main>
   </div>;
