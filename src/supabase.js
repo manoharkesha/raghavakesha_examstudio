@@ -132,3 +132,11 @@ export async function updateCloudPaperStatus(paperId, status, paper) {
   const { error } = await query;
   if (error) throw error;
 }
+
+export async function deleteCloudPaper(paperId, paper) {
+  if (!supabase) return;
+  let query = supabase.from('papers').delete().eq('id', paperId);
+  if (paperId.startsWith('paper-') && paper) query = supabase.from('papers').delete().eq('title', paper.title).eq('publish_date', paper.date);
+  const { error } = await query;
+  if (error) throw error;
+}
