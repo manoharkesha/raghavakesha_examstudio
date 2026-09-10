@@ -7,6 +7,10 @@ export default function PaperAccessManager({ papers, students, cloudAdmin, setNo
   const [disabled, setDisabled] = useState(new Set());
 
   useEffect(() => {
+    if (papers.length && !papers.some(paper => paper.id === paperId)) setPaperId(papers[0].id);
+  }, [papers, paperId]);
+
+  useEffect(() => {
     if (!cloudAdmin) return;
     loadCloudPaperAccess().then(rows => setDisabled(new Set(rows.filter(row => row.paper_id === paperId).map(row => row.student_id)))).catch(error => setNotice(`Paper access could not load: ${error.message}`));
   }, [cloudAdmin, paperId, setNotice]);
