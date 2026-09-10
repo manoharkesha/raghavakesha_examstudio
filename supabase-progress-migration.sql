@@ -6,6 +6,9 @@ create table if not exists public.student_progress (
 );
 
 alter table public.student_progress enable row level security;
+drop policy if exists "Students can read their progress" on public.student_progress;
+drop policy if exists "Students can create their progress" on public.student_progress;
+drop policy if exists "Students can update their progress" on public.student_progress;
 create policy "Students can read their progress" on public.student_progress for select using (auth.uid() = user_id);
 create policy "Students can create their progress" on public.student_progress for insert with check (auth.uid() = user_id);
 create policy "Students can update their progress" on public.student_progress for update using (auth.uid() = user_id) with check (auth.uid() = user_id);

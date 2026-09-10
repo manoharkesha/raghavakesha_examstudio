@@ -72,6 +72,16 @@ $$;
 revoke all on function public.is_admin() from public;
 grant execute on function public.is_admin() to authenticated;
 
+drop policy if exists "Users can view their profile" on public.profiles;
+drop policy if exists "Users can create their profile" on public.profiles;
+drop policy if exists "Published papers are public" on public.papers;
+drop policy if exists "Published paper questions are public" on public.questions;
+drop policy if exists "Published paper options are public" on public.options;
+drop policy if exists "Users can view their attempts" on public.attempts;
+drop policy if exists "Users can create their attempts" on public.attempts;
+drop policy if exists "Users can view their attempt answers" on public.attempt_answers;
+drop policy if exists "Users can create their attempt answers" on public.attempt_answers;
+
 create policy "Users can view their profile" on public.profiles for select using (auth.uid() = id);
 create policy "Users can create their profile" on public.profiles for insert with check (auth.uid() = id);
 create policy "Published papers are public" on public.papers for select using (status = 'Published' or public.is_admin());
