@@ -92,7 +92,7 @@ function App() {
       {view === 'overview' && <Overview session={session} store={store} isAdmin={isAdmin} setPage={setPage} startPaper={setActivePaper} />}
       {view === 'exams' && <ExamLibrary session={session} store={store} startPaper={setActivePaper} />}
       {view === 'results' && <Results session={session} store={store} startPaper={setActivePaper} reviewAttempt={setReviewAttempt} />}
-      {view === 'manage' && isAdmin && <PaperEditorAdmin store={store} setStore={setStore} setNotice={setNotice} cloudAdmin={Boolean(supabase && session.id)} />}
+      {view === 'manage' && isAdmin && <ManagePapers store={store} setStore={setStore} setNotice={setNotice} cloudAdmin={Boolean(supabase && session.id)} />}
       {view === 'students' && isAdmin && <Students store={store} setReviewAttempt={setReviewAttempt} onDelete={async (userId) => { if (supabase) await deleteCloudStudent(userId); setStore(current => ({ ...current, users: current.users.filter(user => user.id !== userId), attempts: current.attempts.filter(attempt => attempt.userId !== userId) })); setNotice('Student account deleted.'); }} />}
       {view === 'settings' && <Settings session={session} />}
     </main>
