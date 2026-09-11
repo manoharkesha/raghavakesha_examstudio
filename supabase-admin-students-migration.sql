@@ -3,6 +3,29 @@
 drop policy if exists "Admins can view student progress" on public.student_progress;
 create policy "Admins can view student progress" on public.student_progress for select using (public.is_admin() or auth.uid() = user_id);
 
+create or replace function public.delete_student_attempt(student_id uuid, attempt_id text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Only administrators can delete student answer sheets';
+  end if;
+  update public.student_progress
+  set attempts = coalesce((
+    select jsonb_agg(attempt)
+    from jsonb_array_elements(attempts) as attempt
+    where attempt->>'id' <> attempt_id
+  ), '[]'::jsonb), updated_at = now()
+  where user_id = student_id;
+end;
+$$;
+
+revoke all on function public.delete_student_attempt(uuid, text) from public;
+grant execute on function public.delete_student_attempt(uuid, text) to authenticated;
+
 create or replace function public.delete_student_account(student_id uuid)
 returns void
 language plpgsql

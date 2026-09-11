@@ -91,6 +91,12 @@ export async function deleteCloudStudent(userId) {
   if (error) throw error;
 }
 
+export async function deleteCloudStudentAttempt(userId, attemptId) {
+  if (!supabase) return;
+  const { error } = await supabase.rpc('delete_student_attempt', { student_id: userId, attempt_id: attemptId });
+  if (error) throw error;
+}
+
 export async function changeCloudStudentPassword(userId, newPassword) {
   if (!supabase) return;
   const { error } = await supabase.rpc('change_student_password', { student_id: userId, new_password: newPassword });
