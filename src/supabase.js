@@ -85,6 +85,22 @@ export async function loadCloudStudentAttempts() {
   return (data || []).flatMap(row => (row.attempts || []).map(attempt => ({ ...attempt, userId: row.user_id })));
 }
 
+export async function loadCloudMessages(studentId) {
+  if (!supabase) return [];
+  let query = supabase.from('messages').select('id, student_id, sender_id, sender_role, message, created_at').order('created_at', { ascending: true });
+  if (studentId) query = query.eq('student_id', studentId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(item => ({ id: item.id, studentId: item.student_id, senderId: item.sender_id, senderRole: item.sender_role, text: item.message, createdAt: item.created_at }));
+}
+
+export async function sendCloudMessage(studentId, text, senderId, senderRole) {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('messages').insert({ student_id: studentId, sender_id: senderId, message: text, sender_role: senderRole }).select('id, student_id, sender_id, sender_role, message, created_at').single();
+  if (error) throw error;
+  return { id: data.id, studentId: data.student_id, senderId: data.sender_id, senderRole: data.sender_role, text: data.message, createdAt: data.created_at };
+}
+
 export async function deleteCloudStudent(userId) {
   if (!supabase) return;
   const { error } = await supabase.rpc('delete_student_account', { student_id: userId });

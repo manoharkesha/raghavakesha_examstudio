@@ -4,13 +4,14 @@ import {
   ArrowRight, BookOpen, Check, ChevronLeft, ClipboardCheck, Clock3, Code2, Eye, EyeOff,
   Download, FilePlus2, GraduationCap, LayoutDashboard, LogOut, Menu, Plus,
   RotateCcw, Save, Settings2, ShieldCheck, Sparkles, Trash2, Trophy, UserRound,
-  Users, X, XCircle
+  Users, X, XCircle, MessageCircle
 } from 'lucide-react';
 import './styles.css';
-import { changeCloudStudentPassword, cloudLogin, cloudRegister, cloudSignOut, deleteCloudPaper, deleteCloudStudent, deleteCloudStudentAttempt, loadCloudAttempts, loadCloudPapers, loadCloudStudentAttempts, loadCloudStudents, saveCloudAttempts, saveCloudPaper, supabase, updateCloudPaperStatus, updateCloudStudentAttemptComment } from './supabase';
+import { changeCloudStudentPassword, cloudLogin, cloudRegister, cloudSignOut, deleteCloudPaper, deleteCloudStudent, deleteCloudStudentAttempt, loadCloudAttempts, loadCloudMessages, loadCloudPapers, loadCloudStudentAttempts, loadCloudStudents, saveCloudAttempts, saveCloudPaper, sendCloudMessage, supabase, updateCloudPaperStatus, updateCloudStudentAttemptComment } from './supabase';
 import PaperAccessManager from './PaperAccessManager';
 import FilteredStudentAnswerSheets from './StudentAnswerSheets';
 import { downloadAnswerSheetPdf } from './answerSheetPdf';
+import Messages from './Messages';
 
 const STORAGE_KEY = 'zunaira-exam-studio-v1';
 const courses = ['C', 'C++', 'Java', 'Python'];
@@ -46,13 +47,14 @@ const starterData = {
       ]
     }
   ],
-  attempts: []
+  attempts: [],
+  messages: []
 };
 
 function readStore() {
   try { return normalizeStore(JSON.parse(localStorage.getItem(STORAGE_KEY)) || starterData); } catch { return normalizeStore(starterData); }
 }
-function normalizeStore(data) { return { ...data, papers: (data.papers || []).map(paper => ({ ...paper, questions: (paper.questions || []).map(question => ({ ...question, answers: Array.isArray(question.answers) ? question.answers : [question.answer ?? 0] })) })), attempts: (data.attempts || []).map(attempt => ({ ...attempt, answers: Object.fromEntries(Object.entries(attempt.answers || {}).map(([questionId, answer]) => [questionId, Array.isArray(answer) ? answer : [answer]])) })) }; }
+function normalizeStore(data) { return { ...data, papers: (data.papers || []).map(paper => ({ ...paper, questions: (paper.questions || []).map(question => ({ ...question, answers: Array.isArray(question.answers) ? question.answers : [question.answer ?? 0] })) })), attempts: (data.attempts || []).map(attempt => ({ ...attempt, answers: Object.fromEntries(Object.entries(attempt.answers || {}).map(([questionId, answer]) => [questionId, Array.isArray(answer) ? answer : [answer]])) })), messages: data.messages || [] }; }
 function writeStore(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 function todayLabel() { return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date()); }
 function formatDate(value) { return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${value}T12:00:00`)); }
@@ -73,6 +75,7 @@ function App() {
   useEffect(() => { cloudHistoryLoaded.current = false; setCloudSyncError(''); if (!session?.id || !supabase || session.role === 'admin') return; loadCloudAttempts(session.id).then(attempts => { if (attempts.length) setStore(current => ({ ...current, attempts: [...current.attempts.filter(item => item.userId !== session.id), ...attempts] })); cloudHistoryLoaded.current = true; }).catch(error => { cloudHistoryLoaded.current = true; setCloudSyncError(`Cloud history could not load: ${error.message}`); }); }, [session?.id, session?.role]);
   useEffect(() => { if (!supabase || !session) return; loadCloudPapers(session.role === 'admin').then(papers => setStore(current => ({ ...current, papers }))).catch(error => setCloudSyncError(`Cloud papers could not load: ${error.message}`)); }, [session?.id, session?.role]);
   useEffect(() => { if (!supabase || session?.role !== 'admin' || !session?.id) return; Promise.all([loadCloudStudents(), loadCloudStudentAttempts()]).then(([users, attempts]) => setStore(current => ({ ...current, users, attempts: [...current.attempts.filter(item => !users.some(user => user.id === item.userId)), ...attempts] }))).catch(error => setCloudSyncError(`Student answer sheets could not load. Run supabase-admin-students-migration.sql in Supabase SQL Editor. Details: ${error.message}`)); }, [session?.id, session?.role]);
+  useEffect(() => { if (!supabase || !session?.id) return; loadCloudMessages(session.role === 'admin' ? null : session.id).then(messages => setStore(current => ({ ...current, messages }))).catch(error => setCloudSyncError(`Messages could not load. Run supabase-messages-migration.sql in Supabase SQL Editor. Details: ${error.message}`)); }, [session?.id, session?.role]);
   useEffect(() => { if (!session?.id || !supabase || session.role === 'admin' || !cloudHistoryLoaded.current) return; const attempts = store.attempts.filter(item => item.userId === session.id); saveCloudAttempts(session.id, attempts).catch(error => setCloudSyncError(`Cloud history could not save: ${error.message}`)); }, [store.attempts, session?.id, session?.role]);
   useEffect(() => { if (session) sessionStorage.setItem('zunaira-session', JSON.stringify(session)); else sessionStorage.removeItem('zunaira-session'); }, [session]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(null), 3200); return () => clearTimeout(timer); }, [notice]);
@@ -109,6 +112,10 @@ function App() {
     setStore(current => ({ ...current, attempts: current.attempts.map(item => item.id === attempt.id && item.userId === student.id ? { ...item, comment } : item) }));
     setNotice(comment ? 'Comment shared with the student.' : 'Comment removed.');
   };
+  const sendMessage = async (studentId, text) => {
+    const message = supabase ? await sendCloudMessage(studentId, text, session.id, session.role) : { id: `message-${Date.now()}`, studentId, senderId: session.id, senderRole: session.role, text, createdAt: new Date().toISOString() };
+    setStore(current => ({ ...current, messages: [...current.messages, message] }));
+  };
 
   if (!session) return <AuthScreen onLogin={async (name, password) => { if (typeof name === 'object') return setSession(name); const user = await cloudLogin(name, password); if (user) setSession(user); }} onRegister={async (user) => { const cloudUser = await cloudRegister(user); const savedUser = cloudUser || user; setStore(current => ({ ...current, users: [...current.users, savedUser] })); setSession(savedUser); }} users={store.users} />;
   if (reviewAttempt) return <div className="review-shell"><div className="review-download-bar"><button className="secondary-button" onClick={() => downloadAnswerSheetPdf(reviewAttempt.paper, reviewAttempt.attempt, session.name)}><Download size={16} /> Download answer sheet PDF</button></div><ReviewRunner paper={reviewAttempt.paper} attempt={reviewAttempt.attempt} onBack={() => setReviewAttempt(null)} /></div>;
@@ -125,6 +132,7 @@ function App() {
       {view === 'results' && <Results session={session} store={store} startPaper={setActivePaper} reviewAttempt={setReviewAttempt} />}
       {view === 'manage' && isAdmin && <ManagePapers store={store} setStore={setStore} setNotice={setNotice} cloudAdmin={Boolean(supabase && session.id)} />}
       {view === 'students' && isAdmin && <FilteredStudentAnswerSheets store={store} setReviewAttempt={setReviewAttempt} onChangePassword={changeStudentPassword} onDeleteStudent={deleteStudent} onDeleteAttempt={deleteAttempt} onSaveComment={saveAttemptComment} />}
+      {view === 'messages' && <Messages session={session} store={store} onSendMessage={sendMessage} />}
       {view === 'settings' && <Settings session={session} />}
     </main>
   </div>;
@@ -150,7 +158,7 @@ function AuthScreen({ onLogin, onRegister, users }) {
 
 function Sidebar({ session, view, setPage, signOut, mobileMenuOpen }) {
   const admin = session.role === 'admin';
-  const nav = admin ? [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }, { id: 'manage', label: 'Question papers', icon: FilePlus2 }, { id: 'students', label: 'Students', icon: Users }, { id: 'settings', label: 'Settings', icon: Settings2 }] : [{ id: 'overview', label: 'My overview', icon: LayoutDashboard }, { id: 'exams', label: 'Daily exams', icon: ClipboardCheck }, { id: 'results', label: 'My results', icon: Trophy }, { id: 'settings', label: 'Profile settings', icon: Settings2 }];
+  const nav = admin ? [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }, { id: 'manage', label: 'Question papers', icon: FilePlus2 }, { id: 'students', label: 'Students', icon: Users }, { id: 'messages', label: 'Messages', icon: MessageCircle }, { id: 'settings', label: 'Settings', icon: Settings2 }] : [{ id: 'overview', label: 'My overview', icon: LayoutDashboard }, { id: 'exams', label: 'Daily exams', icon: ClipboardCheck }, { id: 'results', label: 'My results', icon: Trophy }, { id: 'messages', label: 'Messages', icon: MessageCircle }, { id: 'settings', label: 'Profile settings', icon: Settings2 }];
   return <><div className={mobileMenuOpen ? 'mobile-menu-backdrop visible' : 'mobile-menu-backdrop'} onClick={() => setPage(view)} /><aside className={mobileMenuOpen ? 'sidebar mobile-open' : 'sidebar'}><div className="sidebar-brand"><div className="brand-mark"><Code2 size={21} /></div><div><strong>Exam Studio</strong></div></div><div className="role-chip">{admin ? <ShieldCheck size={15} /> : <GraduationCap size={15} />} {admin ? 'Administrator' : 'Student portal'}</div><nav>{nav.map(item => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? 'nav-item active' : 'nav-item'} onClick={() => setPage(item.id)}><Icon size={18} /> {item.label}</button>; })}</nav><div className="sidebar-bottom"><div className="mini-profile"><div className="avatar">{initials(session.name)}</div><div><strong>{session.name}</strong><small>{admin ? 'Content manager' : `${session.course} · ${session.year}`}</small></div></div><button className="nav-item signout" onClick={signOut}><LogOut size={17} /> Sign out</button></div></aside></>;
 }
 
