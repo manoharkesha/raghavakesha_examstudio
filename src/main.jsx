@@ -116,6 +116,7 @@ function App() {
     const message = supabase ? await sendCloudMessage(studentId, text, session.id, session.role) : { id: `message-${Date.now()}`, studentId, senderId: session.id, senderRole: session.role, text, createdAt: new Date().toISOString() };
     setStore(current => ({ ...current, messages: [...current.messages, message] }));
   };
+  const sendBroadcast = async (studentIds, text) => Promise.all(studentIds.map(studentId => sendMessage(studentId, text)));
 
   if (!session) return <AuthScreen onLogin={async (name, password) => { if (typeof name === 'object') return setSession(name); const user = await cloudLogin(name, password); if (user) setSession(user); }} onRegister={async (user) => { const cloudUser = await cloudRegister(user); const savedUser = cloudUser || user; setStore(current => ({ ...current, users: [...current.users, savedUser] })); setSession(savedUser); }} users={store.users} />;
   if (reviewAttempt) return <div className="review-shell"><div className="review-download-bar"><button className="secondary-button" onClick={() => downloadAnswerSheetPdf(reviewAttempt.paper, reviewAttempt.attempt, session.name)}><Download size={16} /> Download answer sheet PDF</button></div><ReviewRunner paper={reviewAttempt.paper} attempt={reviewAttempt.attempt} onBack={() => setReviewAttempt(null)} /></div>;
@@ -132,7 +133,7 @@ function App() {
       {view === 'results' && <Results session={session} store={store} startPaper={setActivePaper} reviewAttempt={setReviewAttempt} />}
       {view === 'manage' && isAdmin && <ManagePapers store={store} setStore={setStore} setNotice={setNotice} cloudAdmin={Boolean(supabase && session.id)} />}
       {view === 'students' && isAdmin && <FilteredStudentAnswerSheets store={store} setReviewAttempt={setReviewAttempt} onChangePassword={changeStudentPassword} onDeleteStudent={deleteStudent} onDeleteAttempt={deleteAttempt} onSaveComment={saveAttemptComment} />}
-      {view === 'messages' && <Messages session={session} store={store} onSendMessage={sendMessage} />}
+      {view === 'messages' && <Messages session={session} store={store} onSendMessage={sendMessage} onSendBroadcast={sendBroadcast} />}
       {view === 'settings' && <Settings session={session} />}
     </main>
   </div>;
