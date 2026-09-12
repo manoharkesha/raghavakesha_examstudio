@@ -84,9 +84,9 @@ drop policy if exists "Users can create their attempt answers" on public.attempt
 
 create policy "Users can view their profile" on public.profiles for select using (auth.uid() = id);
 create policy "Users can create their profile" on public.profiles for insert with check (auth.uid() = id);
-create policy "Published papers are public" on public.papers for select using (status = 'Published' or public.is_admin());
-create policy "Published paper questions are public" on public.questions for select using (exists (select 1 from public.papers where papers.id = paper_id and (papers.status = 'Published' or public.is_admin())));
-create policy "Published paper options are public" on public.options for select using (exists (select 1 from public.questions join public.papers on papers.id = questions.paper_id where questions.id = question_id and (papers.status = 'Published' or public.is_admin())));
+create policy "Published papers are public" on public.papers for select using (public.is_admin() or (status = 'Published' and publish_date <= current_date));
+create policy "Published paper questions are public" on public.questions for select using (exists (select 1 from public.papers where papers.id = paper_id and (public.is_admin() or (papers.status = 'Published' and papers.publish_date <= current_date))));
+create policy "Published paper options are public" on public.options for select using (exists (select 1 from public.questions join public.papers on papers.id = questions.paper_id where questions.id = question_id and (public.is_admin() or (papers.status = 'Published' and papers.publish_date <= current_date))));
 create policy "Users can view their attempts" on public.attempts for select using (auth.uid() = user_id);
 create policy "Users can create their attempts" on public.attempts for insert with check (auth.uid() = user_id);
 create policy "Users can view their attempt answers" on public.attempt_answers for select using (exists (select 1 from public.attempts where attempts.id = attempt_id and attempts.user_id = auth.uid()));
