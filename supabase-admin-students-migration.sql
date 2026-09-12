@@ -26,6 +26,32 @@ $$;
 revoke all on function public.delete_student_attempt(uuid, text) from public;
 grant execute on function public.delete_student_attempt(uuid, text) to authenticated;
 
+create or replace function public.update_student_attempt_comment(student_id uuid, attempt_id text, comment_text text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Only administrators can update student result comments';
+  end if;
+  if length(coalesce(comment_text, '')) > 500 then
+    raise exception 'Comment must be 500 characters or fewer';
+  end if;
+  update public.student_progress
+  set attempts = coalesce((
+    select jsonb_agg(case when attempt->>'id' = attempt_id then jsonb_set(attempt, '{comment}', to_jsonb(coalesce(comment_text, '')), true) else attempt end)
+    from jsonb_array_elements(attempts) as attempt
+  ), '[]'::jsonb), updated_at = now()
+  where user_id = student_id
+    and exists (select 1 from jsonb_array_elements(attempts) as item where item->>'id' = attempt_id);
+end;
+$$;
+
+revoke all on function public.update_student_attempt_comment(uuid, text, text) from public;
+grant execute on function public.update_student_attempt_comment(uuid, text, text) to authenticated;
+
 create or replace function public.delete_student_account(student_id uuid)
 returns void
 language plpgsql
